@@ -85,6 +85,12 @@ The project parses a decoded SQLite database. It does not decrypt `EnMicroMsg.db
     python dump-msg.py decoded.db output_dir
     ```
 
+    To dump only one chat by WeChat id or display name:
+
+    ```
+    python dump-msg.py decoded.db output_dir --chat wxid_xxxxx --overwrite
+    ```
+
 + List all chats (required decoded database):
 
     ```
