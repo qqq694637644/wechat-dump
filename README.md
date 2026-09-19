@@ -91,6 +91,16 @@ The project parses a decoded SQLite database. It does not decrypt `EnMicroMsg.db
     python dump-msg.py decoded.db output_dir --chat wxid_xxxxx --overwrite
     ```
 
+    To dump structured JSON instead of text:
+
+    ```
+    python dump-json.py decoded.db output.json --chat wxid_xxxxx --overwrite
+    ```
+
+    By default, JSON output keeps raw emoji/app XML out of the top-level
+    `content` field and extracts common metadata into `payload`. Use
+    `--include-raw` when you need the original message XML for debugging.
+
 + List all chats (required decoded database):
 
     ```
