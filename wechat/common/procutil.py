@@ -9,7 +9,8 @@ def subproc_call(cmd, timeout=None):
     Execute a command with timeout, and return STDOUT and STDERR
 
     Args:
-        cmd(str): the command to execute.
+        cmd(str|list[str]): the command to execute. Prefer a list for
+            cross-platform quoting, especially on Windows paths with spaces.
         timeout(float): timeout in seconds.
 
     Returns:
@@ -17,22 +18,25 @@ def subproc_call(cmd, timeout=None):
     """
     try:
         output = subprocess.check_output(
-            cmd, stderr=subprocess.STDOUT,
-            shell=True, timeout=timeout)
+            cmd,
+            stderr=subprocess.STDOUT,
+            shell=isinstance(cmd, str),
+            timeout=timeout,
+        )
         return output, 0
     except subprocess.TimeoutExpired as e:
-        logger.warn("Command '{}' timeout!".format(cmd))
+        logger.warning("Command '%s' timeout!", cmd)
         if e.output:
-            logger.warn(e.output.decode('utf-8'))
+            logger.warning(e.output.decode('utf-8', errors='replace'))
             return e.output, -1
         else:
             return "", -1
     except subprocess.CalledProcessError as e:
-        logger.warn("Command '{}' failed, return code={}".format(cmd, e.returncode))
-        logger.warn(e.output.decode('utf-8'))
+        logger.warning("Command '%s' failed, return code=%s", cmd, e.returncode)
+        logger.warning(e.output.decode('utf-8', errors='replace'))
         return e.output, e.returncode
     except Exception:
-        logger.warn("Command '{}' failed to run.".format(cmd))
+        logger.warning("Command '%s' failed to run.", cmd)
         return "", -2
 
 

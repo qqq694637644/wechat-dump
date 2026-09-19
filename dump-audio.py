@@ -4,6 +4,7 @@
 import sys
 import base64
 import argparse
+import os
 
 from wechat.parser import WeChatDBParser
 from wechat.msg import TYPE_SPEAK
@@ -12,7 +13,7 @@ from wechat.res import Resource
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('name', help='name of contact')
-    parser.add_argument('--output', help='output mp3 dir', default='/tmp')
+    parser.add_argument('--output', help='output mp3 dir', default='audio-output')
     parser.add_argument('--db', default='decoded.db', help='path to decoded database')
     parser.add_argument('--res', default='resource', help='reseource directory')
     args = parser.parse_args()
@@ -35,10 +36,11 @@ if __name__ == '__main__':
     assert len(msgs) > 0
 
     voice_msgs = [m for m in msgs if m.type == TYPE_SPEAK]
+    os.makedirs(args.output, exist_ok=True)
     for idx, m in enumerate(voice_msgs):
         audio_str, duration = res.get_voice_mp3(m.imgPath)
         audio_bytes = base64.b64decode(audio_str)
-        outf = f'/{args.output}/{idx:04d}-{duration:.1f}s.mp3'
+        outf = os.path.join(args.output, f'{idx:04d}-{duration:.1f}s.mp3')
         with open(outf, 'wb') as f:
             f.write(audio_bytes)
         print(f"Audio written to {outf}")

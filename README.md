@@ -17,29 +17,55 @@ If the tool works for you, please take a moment to add your phone/OS to [the wik
 ## How to use:
 
 #### Dependencies:
-+ adb and rooted android phone connected to a Linux/Mac OSX/Win10+Bash.
++ adb and rooted android phone connected to Windows/macOS/Linux.
 + Python >= 3.8
 + sox (command line tools)
-+ Silk audio decoder (included; build it with `./third-party/compile_silk.sh`)
++ Silk audio decoder (included; build it with `./third-party/compile_silk.sh` on Unix, or place a compatible `decoder.exe` at `third-party/silk/decoder.exe` on Windows)
 + ffmpeg (optional; to decode WXGF images locally)
 + Other python dependencies: `pip install -r requirements.txt`.
 
 #### Get Necessary Data:
 
 1. Pull database file and (for older WeChat versions) avatar index:
-  + Automatic: `./android-interact.sh db`. It may use an incorrect userid.
+  + Cross-platform automatic helper: `python android_interact.py db --out .`.
+    On Windows you can also run `android-interact.cmd db --out .`.
+    It may use an incorrect userid if multiple accounts exist; pass `--user <32-hex-dir>` to select one.
+  + Legacy Unix helper: `./android-interact.sh db`.
   + Manual:
     + Figure out your `${userid}` by inspecting the contents of `/data/data/com.tencent.mm/MicroMsg` on the __root__ filesystem of the device.
       It should be a 32-character-long name consisting of hexadecimal digits.
     + Get `/data/data/com.tencent.mm/MicroMsg/${userid}/EnMicroMsg.db` from the device.
 2. Decode `EnMicroMsg.db`. We do not provide instructions to do that.
 3. Copy the unencrypted WeChat user resource directory `/data/data/com.tencent.mm/MicroMsg/${userid}/{avatar,emoji,image2,sfs,video,voice2}` from the phone to the `resource` directory:
-	+ `./android-interact.sh res`
-	+ Change `RES_DIR` in the script if the location of these directories is different on your phone.
+	+ Cross-platform: `python android_interact.py res --out resource`
+	+ Windows wrapper: `android-interact.cmd res --out resource`
+	+ Legacy Unix helper: `./android-interact.sh res`
+	+ Pass `--res-dir <remote path>` if the location of these directories is different on your phone.
       For older version of WeChat, the directory may be `/mnt/sdcard/tencent/MicroMsg/`
+	  and the Python helper supports `--old-sdcard-layout`.
 	+ This can take a while. It can be faster to first archive it with `tar` with or without compression, and then copy the archive,
-  	  `busybox tar` is recommended as the Android system's `tar` may choke on long paths.
+	  `busybox tar` is recommended as the Android system's `tar` may choke on long paths. The Python helper does this on-device and extracts with Python, so no local bash/tar is required.
 	+ In the end, we need a `resource` directory with the following subdir: `avatar,emoji,image2,sfs,video,voice2`.
+
+#### Windows quick start without WSL:
+
+```powershell
+git clone https://github.com/qqq694637644/wechat-dump.git
+cd wechat-dump
+python -m pip install -r requirements.txt
+
+# Pull encrypted DB/resources from rooted Android. adb must be in PATH.
+python .\android_interact.py db --out .
+python .\android_interact.py res --out resource
+
+# Decrypt EnMicroMsg.db with your own SQLCipher/WCDB key workflow, then parse the decoded DB.
+python .\list-chats.py C:\wechat-stage\decoded.db
+python .\dump-msg.py C:\wechat-stage\decoded.db output_dir
+python .\dump-html.py "<contact_display_name>" --db C:\wechat-stage\decoded.db --res resource --output output.html
+python .\count_message.py output_dir
+```
+
+The project parses a decoded SQLite database. It does not decrypt `EnMicroMsg.db` by itself.
 
 4. (Optional) Decode WXGF images:
    * If `ffmpeg`/`ffprobe` are available, WXGF images/emojis are decoded locally when possible.
@@ -56,25 +82,25 @@ If the tool works for you, please take a moment to add your phone/OS to [the wik
 + Parse and dump text messages of __every__ chat (requires decoded database):
 
     ```
-    ./dump-msg.py decoded.db output_dir
+    python dump-msg.py decoded.db output_dir
     ```
 
 + List all chats (required decoded database):
 
     ```
-    ./list-chats.py decoded.db
+    python list-chats.py decoded.db
     ```
 
 + Generate statistics report on text messages (requires `output_dir` from `./dump-msg.py`):
 
     ```
-    ./count-message.sh output_dir
+    python count_message.py output_dir
     ```
 
 + Dump messages of one contact to html, containing voice messages, emojis, and images (requires decoded database and `resource`):
 
     ```
-    ./dump-html.py "<contact_display_name>"
+    python dump-html.py "<contact_display_name>"
     ```
 
     * The output file is `output.html`. Check `./dump-html.py -h` to use different input/output paths.

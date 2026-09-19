@@ -4,6 +4,7 @@
 import os
 import tempfile
 import logging
+import shutil
 logger = logging.getLogger(__name__)
 
 from .common.textutil import get_file_b64
@@ -11,6 +12,16 @@ from .common.procutil import subproc_succ
 
 SILK_DECODER = os.path.join(os.path.dirname(__file__),
                             '../third-party/silk/decoder')
+
+
+def _silk_decoder_path():
+    candidates = [SILK_DECODER]
+    if os.name == 'nt':
+        candidates.insert(0, SILK_DECODER + '.exe')
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return None
 
 def parse_wechat_audio_file(file_name):
     try:
@@ -29,10 +40,10 @@ def do_parse_wechat_audio_file(file_name):
         with open(file_name, 'rb') as f:
             header = f.read(10)
         if b'AMR' in header:
-            cmd = f"sox -e signed -c 1 {file_name} {mp3_file}"
-            subproc_succ(cmd)
-            cmd = f"soxi -D {mp3_file}"
-            duration = float(subproc_succ(cmd))
+            if shutil.which('sox') is None or shutil.which('soxi') is None:
+                raise RuntimeError("sox/soxi not found in PATH. Install SoX to decode voice messages.")
+            subproc_succ(['sox', '-e', 'signed', '-c', '1', file_name, mp3_file])
+            duration = float(subproc_succ(['soxi', '-D', mp3_file]))
 
             # The below is python2 only. It should be equivalent to using sox from command line
             # import pysox
@@ -44,13 +55,16 @@ def do_parse_wechat_audio_file(file_name):
             # signal = infile.get_signal().get_signalinfo()
             # duration = signal['length'] * 1.0 / signal['rate']
         elif b'SILK' in header:
-            if not os.path.exists(SILK_DECODER):
-                raise RuntimeError("Silk decoder is not compiled. Please see README.md.")
+            silk_decoder = _silk_decoder_path()
+            if silk_decoder is None:
+                raise RuntimeError(
+                    "Silk decoder is not available. Build third-party/silk/decoder "
+                    "on Unix or place decoder.exe next to it on Windows."
+                )
 
             raw_file = os.path.join(temp,
                                     os.path.basename(file_name)[:-4] + '.raw')
-            cmd = '{0} {1} {2}'.format(SILK_DECODER, file_name, raw_file)
-            out = subproc_succ(cmd)
+            out = subproc_succ([silk_decoder, file_name, raw_file])
             for line in out.split(b'\n'):
                 if b'File length' in line:
                     duration = float(line[13:-3].strip())
@@ -59,7 +73,9 @@ def do_parse_wechat_audio_file(file_name):
                 raise RuntimeError("Error decoding silk audio file!" + out.decode('utf-8'))
 
             # TODO don't know how to do this with python
-            subproc_succ('sox -r 24000 -e signed -b 16 -c 1 {} {}'.format(raw_file, mp3_file))
+            if shutil.which('sox') is None:
+                raise RuntimeError("sox not found in PATH. Install SoX to convert SILK audio to MP3.")
+            subproc_succ(['sox', '-r', '24000', '-e', 'signed', '-b', '16', '-c', '1', raw_file, mp3_file])
         else:
             raise NotImplementedError("Audio file format cannot be recognized.")
         mp3_string = get_file_b64(mp3_file)
